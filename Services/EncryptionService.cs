@@ -51,5 +51,19 @@ namespace SecureNotes.Services
             using var sha256 = SHA256.Create();
             return sha256.ComputeHash(Encoding.UTF8.GetBytes(username));
         }
+
+        public string GenerateHmac(string data, string username)
+        {
+            var key = GetKey(username); 
+            using var hmac = new HMACSHA256(key);
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return Convert.ToBase64String(hash);
+        }
+
+        public bool VerifyHmac(string data, string expectedHmac, string username)
+        {
+            var actualHmac = GenerateHmac(data, username);
+            return actualHmac == expectedHmac;
+        }
     }
 }

@@ -1,6 +1,9 @@
 using SecureNotes.Models;
 using SecureNotes.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Mvc;
 
 namespace SecureNotes.Services;
 
@@ -15,31 +18,41 @@ public class NoteService
         _encryptionService = encryptionService;
     }
 
-    public async Task<IEnumerable<Note>> GetNotesAsync(string owner)
+    public async Task<IEnumerable<NoteDto>> GetNotesAsync(string owner)
     {
         var encryptedNotes = await _context.Notes.Where(n => n.Owner == owner).ToListAsync();
         
+        var result = new List<NoteDto>();
+
         foreach (var note in encryptedNotes)
         {
-            note.Content = _encryptionService.Decrypt(note.Content, owner);
+            var decryptedContent = _encryptionService.Decrypt(note.Content, owner);
+            result.Add(new NoteDto
+            {
+                Id = note.Id,
+                Content = decryptedContent,
+                Owner = note.Owner
+            });
         }
 
-        return encryptedNotes;
+        return result;
     }
 
-    public async Task<Note> AddNoteAsync(string content, string owner)
+    public async Task AddNoteAsync(string content, string owner)
     {
         var encryptedContent = _encryptionService.Encrypt(content, owner);        
+        
+        var hmac = _encryptionService.GenerateHmac(encryptedContent, owner);
 
         var note = new Note 
         { 
             Content = encryptedContent, 
+            Hmac = hmac,
             Owner = owner 
         };
 
         _context.Notes.Add(note);
         await _context.SaveChangesAsync();
-        return note;
     }
 
     public async Task ClearNotesForUserAsync(string owner)
