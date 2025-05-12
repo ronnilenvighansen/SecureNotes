@@ -1,7 +1,7 @@
 using SecureNotes.Data;
 using Microsoft.EntityFrameworkCore;
 using SecureNotes.Services;
-using SecureNotes.Controllers;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,36 +15,28 @@ builder.Services.AddScoped<NoteService>();
 
 builder.Services.AddControllers();
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = "Cookies";
-    options.DefaultChallengeScheme = "oidc";
-})
-.AddCookie("Cookies")
-.AddOpenIdConnect("oidc", options =>
-{
-    options.Authority = "https://localhost:8080/realms/SecureNotes";
-    options.ClientId = "secure-notes-client";
-    options.ClientSecret = "AmEGHjQ7DDfhMM6nVEed5E7nXjhMTint";
-    options.ResponseType = "code";
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.Authority = "https://localhost:8443/realms/SecureNotes";
+        options.Audience = "secure-notes-client";
+        options.RequireHttpsMetadata = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = false, 
+            NameClaimType = "preferred_username"
+        };
+    });
 
-    options.SaveTokens = true;
-    options.GetClaimsFromUserInfoEndpoint = true;
-
-    options.TokenValidationParameters.NameClaimType = "preferred_username";
-
-    options.RequireHttpsMetadata = true;
-});
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddAntiforgery(options =>
+builder.WebHost.ConfigureKestrel(options =>
 {
-    options.HeaderName = "X-CSRF-TOKEN";
-    options.Cookie.Name = "X-CSRF-TOKEN"; 
-    options.Cookie.HttpOnly = false; 
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; 
-
+    options.ListenAnyIP(7084, listenOptions =>
+    {
+        listenOptions.UseHttps("certs/localhost.pfx", "password");
+    });
 });
 
 var app = builder.Build();

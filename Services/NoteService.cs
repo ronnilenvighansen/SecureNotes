@@ -1,9 +1,6 @@
 using SecureNotes.Models;
 using SecureNotes.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.AspNetCore.Mvc;
 
 namespace SecureNotes.Services;
 
