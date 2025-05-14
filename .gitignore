@@ -1,3 +1,8 @@
 bin/
 obj/
 certs/
+keycloak-data/
+*.db
+*.db-*
+appsettings.*
+Migrations/

@@ -9,9 +9,11 @@ var connectionString = "Data Source=SecureNotes.db";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
 
-builder.Services.AddSingleton<EncryptionService>();
+builder.Services.AddScoped<EncryptionService>();
 
 builder.Services.AddScoped<NoteService>();
+
+builder.Services.AddScoped<UserKeyService>();
 
 builder.Services.AddControllers();
 

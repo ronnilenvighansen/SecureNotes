@@ -8,22 +8,32 @@ public class NoteService
 {
     private readonly ApplicationDbContext _context;
     private readonly EncryptionService _encryptionService;
+    private readonly UserKeyService _userKeyService;
 
-    public NoteService(ApplicationDbContext context, EncryptionService encryptionService)
+
+    public NoteService(ApplicationDbContext context, EncryptionService encryptionService, UserKeyService userKeyService)
     {
         _context = context;
         _encryptionService = encryptionService;
+        _userKeyService = userKeyService;
     }
 
     public async Task<IEnumerable<NoteDto>> GetNotesAsync(string owner)
     {
+        await _userKeyService.EnsureSaltExistsAsync(owner);
+        
         var encryptedNotes = await _context.Notes.Where(n => n.Owner == owner).ToListAsync();
         
         var result = new List<NoteDto>();
 
         foreach (var note in encryptedNotes)
         {
-            var decryptedContent = _encryptionService.Decrypt(note.Content, owner);
+            if (!await _encryptionService.VerifyHmacAsync(note.Content, note.Hmac, owner))
+            {
+                continue;
+            }
+
+            var decryptedContent = await _encryptionService.DecryptAsync(note.Content, owner);
             result.Add(new NoteDto
             {
                 Id = note.Id,
@@ -37,9 +47,11 @@ public class NoteService
 
     public async Task AddNoteAsync(string content, string owner)
     {
-        var encryptedContent = _encryptionService.Encrypt(content, owner);        
+        await _userKeyService.EnsureSaltExistsAsync(owner);
+
+        var encryptedContent = await _encryptionService.EncryptAsync(content, owner);        
         
-        var hmac = _encryptionService.GenerateHmac(encryptedContent, owner);
+        var hmac = await _encryptionService.GenerateHmacAsync(encryptedContent, owner);
 
         var note = new Note 
         { 

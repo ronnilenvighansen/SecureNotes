@@ -1,13 +1,24 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using SecureNotes.Data;
 
 namespace SecureNotes.Services
 {
     public class EncryptionService
     {
-        public string Encrypt(string plainText, string username)
+        private readonly ApplicationDbContext _context;
+        private readonly UserKeyService _userKeyService;
+        public EncryptionService(ApplicationDbContext context, UserKeyService userKeyService)
         {
-            var key = GetKey(username);
+            _context = context;
+            _userKeyService = userKeyService;
+        }
+
+        public async Task<string> EncryptAsync(string plainText, string username)
+        {
+            await _userKeyService.EnsureSaltExistsAsync(username);
+            var key = await GetKeyAsync(username);
 
             using var aes = Aes.Create();
             aes.Key = key;
@@ -25,9 +36,10 @@ namespace SecureNotes.Services
             return Convert.ToBase64String(combinedBytes);
         }
 
-        public string Decrypt(string encryptedText, string username)
+        public async Task<string> DecryptAsync(string encryptedText, string username)
         {
-            var key = GetKey(username);
+            await _userKeyService.EnsureSaltExistsAsync(username);
+            var key = await GetKeyAsync(username);
 
             var combinedBytes = Convert.FromBase64String(encryptedText);
 
@@ -46,23 +58,36 @@ namespace SecureNotes.Services
             return Encoding.UTF8.GetString(plainBytes);
         }
 
-        private byte[] GetKey(string username)
+        /*private byte[] GetKey(string username)
         {
             using var sha256 = SHA256.Create();
             return sha256.ComputeHash(Encoding.UTF8.GetBytes(username));
+        }*/
+
+        private async Task<byte[]> GetKeyAsync(string username)
+        {
+            await _userKeyService.EnsureSaltExistsAsync(username);
+            var userKey = await _context.UserKeys.FirstOrDefaultAsync(u => u.Username == username);
+            if (userKey == null)
+                throw new InvalidOperationException("User salt not found. You must register the user key first.");
+
+            using var pbkdf2 = new Rfc2898DeriveBytes(username, userKey.Salt, 100_000, HashAlgorithmName.SHA256);
+            return pbkdf2.GetBytes(32);
         }
 
-        public string GenerateHmac(string data, string username)
+        public async Task<string> GenerateHmacAsync(string data, string username)
         {
-            var key = GetKey(username); 
+            await _userKeyService.EnsureSaltExistsAsync(username);
+            var key = await GetKeyAsync(username); 
             using var hmac = new HMACSHA256(key);
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
             return Convert.ToBase64String(hash);
         }
 
-        public bool VerifyHmac(string data, string expectedHmac, string username)
+        public async Task<bool> VerifyHmacAsync(string data, string expectedHmac, string username)
         {
-            var actualHmac = GenerateHmac(data, username);
+            await _userKeyService.EnsureSaltExistsAsync(username);
+            var actualHmac = await GenerateHmacAsync(data, username);
             return actualHmac == expectedHmac;
         }
     }
