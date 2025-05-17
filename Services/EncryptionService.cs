@@ -58,12 +58,6 @@ namespace SecureNotes.Services
             return Encoding.UTF8.GetString(plainBytes);
         }
 
-        /*private byte[] GetKey(string username)
-        {
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(Encoding.UTF8.GetBytes(username));
-        }*/
-
         private async Task<byte[]> GetKeyAsync(string username)
         {
             await _userKeyService.EnsureSaltExistsAsync(username);

@@ -6,3 +6,4 @@ keycloak-data/
 *.db-*
 appsettings.*
 Migrations/
+.env
